@@ -29,8 +29,11 @@ The project was challenging in terms of managing large datasets, refining the pr
 Repository Structure
 
 /data: Includes both the original and processed datasets.
+
 /notebooks: Contains Jupyter notebooks that detail the exploratory data analysis and modeling process.
+
 /src: Source code for data processing, model building, and evaluation.
+
 /visualizations: Consists of plots and insights from the visualization efforts.
 
 
