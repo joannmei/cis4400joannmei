@@ -263,3 +263,256 @@ print(f'Root Mean Squared Error (RMSE) for November 2020: {rmse_nov}')
 predictions_output_path_nov = "s3://my-bigdata-project-jm/trusted/model_predictions_2020-11.parquet" 
 
 predictions_nov.select("features", "tips", "prediction").write.parquet(predictions_output_path_nov, mode="overwrite") 
+
+ 
+
+from pyspark.sql import SparkSession 
+
+from pyspark.sql.types import StructType, StructField, DoubleType 
+
+ 
+
+# Create a Spark session 
+
+spark = SparkSession.builder.appName("RegressionVisualization").getOrCreate() 
+
+ 
+
+# Define the schema based on your data structure 
+
+schema = StructType([ 
+
+    StructField("tips", DoubleType(), True), 
+
+    StructField("prediction", DoubleType(), True), 
+
+    # Add more fields as needed 
+
+]) 
+
+ 
+
+# Load the Parquet file with the specified schema 
+
+parquet_path = "s3://my-bigdata-project-jm/trusted/part-00000-tid-7188330993360174430-51482a03-3ecc-4833-b74f-1346a4966b12-53-1-c000.snappy.parquet" 
+
+test_results = spark.read.schema(schema).parquet(parquet_path) 
+
+ 
+
+# Sample 25% of the data 
+
+test_results = test_results.sample(False, 0.20) 
+
+ 
+
+# Select the 'tip' and 'prediction' columns 
+
+df = test_results.select('tips', 'prediction').toPandas() 
+
+ 
+
+# VISUALIZATIONS
+
+
+# Your S3 bucket and file path 
+
+s3_bucket = 'plot_bucket' 
+
+s3_filepath = 'my-bigdata-project-jm/curated/regression_plot.png' 
+
+ 
+
+# Convert Spark DataFrame to Pandas 
+
+df = test_results.select('tips', 'prediction').toPandas() 
+
+ 
+
+# Set the style for Seaborn plots 
+
+sns.set_style("white") 
+
+ 
+
+# Create a relationship plot between tips and prediction 
+
+sns.lmplot(x='tips', y='prediction', data=df) 
+
+ 
+
+# Add labels and title 
+
+plt.xlabel('Actual Tips') 
+
+plt.ylabel('Predicted Tips') 
+
+plt.title('Regression Plot: Actual Tips vs. Predicted Tips') 
+
+ 
+
+# Save the plot to memory buffer 
+
+img_buffer = io.BytesIO() 
+
+plt.savefig(img_buffer, format='png') 
+
+ 
+
+# Connect to your S3 bucket and upload the plot 
+
+s3_client = boto3.client('s3') 
+
+s3_client.upload_fileobj(img_buffer, s3_bucket, s3_filepath) 
+
+ 
+
+# Print the S3 URL of the saved plot 
+
+s3_url = f's3://{s3_bucket}/{s3_filepath}' 
+ 
+
+# Your S3 bucket and file path 
+
+s3_bucket = 'plot_bucket' 
+
+s3_filepath = 'my-bigdata-project-jm/curated/residual_plot.png' 
+
+ 
+
+# Convert Spark DataFrame to Pandas 
+
+df = test_results.select('tips', 'prediction').toPandas() 
+
+ 
+
+# Set the style for Seaborn plots 
+
+sns.set_style("white") 
+
+ 
+
+# Create a residual plot between tips and prediction 
+
+sns.residplot(x='tips', y='prediction', data=df) 
+
+ 
+
+# Add labels and title 
+
+plt.xlabel('Actual Tips') 
+
+plt.ylabel('Residuals') 
+
+plt.title('Residual Plot') 
+
+ 
+
+# Save the plot to memory buffer 
+
+img_buffer = io.BytesIO() 
+
+plt.savefig(img_buffer, format='png') 
+
+ 
+
+# Connect to your S3 bucket and upload the plot 
+
+s3_client = boto3.client('s3') 
+
+s3_client.upload_fileobj(img_buffer, s3_bucket, s3_filepath) 
+
+ 
+
+# Print the S3 URL of the saved plot 
+
+s3_url = f's3://{s3_bucket}/{s3_filepath}' 
+
+
+# Assuming 'df' contains the sampled and selected data 
+
+sns.set_style("whitegrid")  # Adjust the style as needed 
+
+ 
+
+# Create the distribution plot 
+
+sns.displot(df['tips'], kde=True)  
+
+plt.title('Distribution of Tips') 
+
+plt.xlabel('Tips') 
+
+plt.ylabel('Frequency') 
+
+ 
+
+# Save the plot to memory buffer 
+
+img_buffer = io.BytesIO() 
+
+plt.savefig(img_buffer, format='png') 
+
+ 
+
+# Connect to your S3 bucket and upload the plot 
+
+s3_client = boto3.client('s3') 
+
+s3_client.upload_fileobj(img_buffer, s3_bucket, s3_filepath) 
+
+ 
+
+# Print the S3 URL of the saved plot 
+
+s3_url = f's3://{s3_bucket}/{s3_filepath}' 
+
+
+
+# Your S3 bucket and file path 
+
+s3_bucket = 'plot_bucket' 
+
+s3_filepath = 'my-bigdata-project-jm/curated/prediction_distribution_plot.png' 
+
+ 
+
+# Assuming 'df' contains the sampled and selected data 
+
+sns.histplot(df['prediction'], kde=True) 
+
+plt.xlabel('Predictions') 
+
+plt.ylabel('Frequency') 
+
+plt.title('Distribution of Predictions') 
+
+ 
+
+# Save the plot to memory buffer 
+
+img_buffer = io.BytesIO() 
+
+plt.savefig(img_buffer, format='png') 
+
+ 
+
+# Connect to your S3 bucket and upload the plot 
+
+s3_client = boto3.client('s3') 
+
+s3_client.upload_fileobj(img_buffer, s3_bucket, s3_filepath) 
+
+ 
+
+# Print the S3 URL of the saved plot 
+
+s3_url = f's3://{s3_bucket}/{s3_filepath}' 
+
+ 
+
+# Show the plot (optional for local testing) 
+
+plt.show() 
+
+plt.show()
