@@ -1,0 +1,265 @@
+# IMPORT LIBRARIES
+
+import os 
+
+import pandas as pd 
+
+from pyspark.sql import SQLContext 
+
+from pyspark.sql import SparkSession 
+
+from pyspark import SparkContext as sc 
+
+import jsc 
+
+import pyarrow 
+
+import pyspark 
+
+import awswrangler as wr 
+
+import s3fs 
+
+from sklearn.preprocessing import MinMaxScaler 
+
+from sklearn.model_selection import train_test_split 
+
+from sklearn.linear_model import LinearRegression 
+
+from sklearn.metrics import mean_squared_error 
+
+ 
+
+# Data Cleaning Code 
+
+ 
+
+from pyspark.sql import SparkSession 
+
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DoubleType 
+
+ 
+
+spark = SparkSession.builder.appName("data_cleaning").getOrCreate() 
+
+ 
+
+schema = StructType([ 
+
+    StructField("trip_miles", DoubleType(), True), 
+
+    StructField("trip_time", IntegerType(), True), 
+
+    StructField("base_passenger_fare", DoubleType(), True), 
+
+    StructField("tolls", DoubleType(), True), 
+
+    StructField("bcf", DoubleType(), True), 
+
+    StructField("sales_tax", DoubleType(), True), 
+
+    StructField("tips", DoubleType(), True), 
+
+    StructField("driver_pay", DoubleType(), True), 
+
+]) 
+
+ 
+
+# Read data from /landing folder and apply schema for September 2020 
+
+landing_file_path_sep = 's3://my-bigdata-project-jm/landing/fhvhv_tripdata_2020-09.parquet' 
+
+trips0920 = spark.read.parquet(landing_file_path_sep, schema=schema) 
+
+ 
+
+# Remove unnecessary columns 
+
+columns_to_drop = ['originating_base_num', 'on_scene_datetime', 'airport_fee', 'shared_request_flag', 'shared_match_flag', 'access_a_ride_flag', 'wav_request_flag', 'wav_match_flag', 'congestion_surcharge', 'hvfhs_license_num', 'dispatching_base_num', 'request_datetime', 'pickup_datetime', 'dropoff_datetime', 'PULocationID', 'DOLocationID'] 
+
+trips0920cleaned = trips0920.drop(*columns_to_drop) 
+
+ 
+
+# Specify the complete S3 path for the cleaned data 
+
+raw_output_path = "s3a://my-bigdata-project-jm/raw/cleaned_data_sep.parquet" 
+
+ 
+
+# Write the cleaned data to /raw folder as a Parquet file using PySpark 
+
+trips0920cleaned.write.mode("overwrite").parquet(raw_output_path)  
+
+ 
+
+# Read data from /raw folder 
+
+raw_file_path_sep = "s3://my-bigdata-project-jm/raw/cleaned_data_sep.parquet" 
+
+ 
+
+# Feature engineering - create additional features for September 2020 
+
+trips0920cleaned = trips0920cleaned.withColumn("tips_to_base_fare_ratio", trips0920cleaned["tips"] / trips0920cleaned["base_passenger_fare"]) 
+
+trips0920cleaned = trips0920cleaned.withColumn("cost_per_mile", trips0920cleaned["base_passenger_fare"] / trips0920cleaned["trip_miles"]) 
+
+trips0920cleaned = trips0920cleaned.withColumn("cost_per_minute", trips0920cleaned["base_passenger_fare"] / trips0920cleaned["trip_time"]) 
+
+ 
+
+ 
+
+# Model Code 
+
+# Train-test split for September 2020 
+
+train_data_sep, test_data_sep = trips0920cleaned.randomSplit([0.8, 0.2], seed=42) 
+
+ 
+
+# Model Training for September 2020 
+
+from pyspark.ml.feature import VectorAssembler 
+
+from pyspark.ml.regression import LinearRegression 
+
+from pyspark.ml import Pipeline 
+
+from pyspark.ml.evaluation import RegressionEvaluator 
+
+ 
+
+# Define features for modeling 
+
+feature_cols = ["trip_miles", "trip_time", "base_passenger_fare", "tolls", "bcf", "sales_tax"] 
+
+assembler_sep = VectorAssembler(inputCols=feature_cols, outputCol="features") 
+
+ 
+
+# Linear Regression model 
+
+lr_sep = LinearRegression(labelCol="tips") 
+
+ 
+
+# Create a pipeline for September 2020 
+
+pipeline_sep = Pipeline(stages=[assembler_sep, lr_sep]) 
+
+ 
+
+# Train the model for September 2020 
+
+model_sep = pipeline_sep.fit(train_data_sep) 
+
+ 
+
+# Save the model to /models folder for September 2020 
+
+model_output_path_sep = "s3://my-bigdata-project-jm/models/linear_regression_model_sep" 
+
+model_sep.write().overwrite().save(model_output_path_sep) 
+
+ 
+
+# Make predictions on the test set for September 2020 
+
+predictions_sep = model_sep.transform(test_data_sep) 
+
+ 
+
+# Evaluate the model for September 2020 
+
+evaluator_sep = RegressionEvaluator(labelCol="tips", predictionCol="prediction", metricName="rmse") 
+
+rmse_sep = evaluator_sep.evaluate(predictions_sep) 
+
+ 
+
+print(f'Root Mean Squared Error (RMSE) for September 2020: {rmse_sep}') 
+
+ 
+
+# Save predictions to /trusted folder for September 2020 
+
+predictions_output_path_sep = "s3://my-bigdata-project-jm/trusted/model_predictions_sep.parquet" 
+
+predictions_sep.select("features", "tips", "prediction").write.parquet(predictions_output_path_sep, mode="overwrite") 
+
+ 
+
+Output: Root Mean Squared Error (RMSE) for September 2020: 1.600033261612369 
+
+ 
+
+# Applying to rest of dataset files 
+
+# Read data from /landing folder and apply schema for November 2020 
+
+landing_file_path_nov = 's3://my-bigdata-project-jm/landing/fhvhv_tripdata_2020-11.parquet' 
+
+trips1120 = spark.read.parquet(landing_file_path_nov, schema=schema) 
+
+ 
+
+# Remove unnecessary columns for November 2020 
+
+trips1120cleaned = trips1120.drop(*columns_to_drop) 
+
+ 
+
+# Specify the complete S3 path for the cleaned data 
+
+raw_output_path_nov = "s3a://my-bigdata-project-jm/raw/cleaned_data_2020-11.parquet" 
+
+ 
+
+# Write the cleaned data to /raw folder as a Parquet file using PySpark 
+
+trips1120cleaned.write.mode("overwrite").parquet(raw_output_path_nov) 
+
+ 
+
+# Read data from /raw folder for November 2020 
+
+raw_file_path_nov = "s3://my-bigdata-project-jm/raw/cleaned_data_2020-11.parquet" 
+
+ 
+
+# Feature engineering - create additional features for November 2020 
+
+trips1120cleaned = trips1120cleaned.withColumn("tips_to_base_fare_ratio", trips1120cleaned["tips"] / trips1120cleaned["base_passenger_fare"]) 
+
+trips1120cleaned = trips1120cleaned.withColumn("cost_per_mile", trips1120cleaned["base_passenger_fare"] / trips1120cleaned["trip_miles"]) 
+
+trips1120cleaned = trips1120cleaned.withColumn("cost_per_minute", trips1120cleaned["base_passenger_fare"] / trips1120cleaned["trip_time"]) 
+
+ 
+
+# Make predictions on the test set for November 2020 using the model trained on September 2020 
+
+predictions_nov = model_sep.transform(trips1120cleaned) 
+
+ 
+
+# Evaluate the model for November 2020 
+
+evaluator_nov = RegressionEvaluator(labelCol="tips", predictionCol="prediction", metricName="rmse") 
+
+rmse_nov = evaluator_nov.evaluate(predictions_nov) 
+
+ 
+
+print(f'Root Mean Squared Error (RMSE) for November 2020: {rmse_nov}') 
+
+ 
+
+# Save predictions to /trusted folder for November 2020 
+
+predictions_output_path_nov = "s3://my-bigdata-project-jm/trusted/model_predictions_2020-11.parquet" 
+
+predictions_nov.select("features", "tips", "prediction").write.parquet(predictions_output_path_nov, mode="overwrite") 
